@@ -12,7 +12,7 @@ import "core:path/filepath"
 import "core:flags"
 import "base:runtime"
 import "libusb"
-import "ini"
+import "core:encoding/ini"
 VID       :: 0x1d57
 PID       :: 0xfa60
 WIRED_PID :: 0xfa61
@@ -178,19 +178,20 @@ CfgErr :: enum {
     InvalidAngleSnap,
     RippleControlNotProvided,
     InvalidRippleControl,
+    CouldNotLoadConfig,
 
 }
 ConfigError :: union #shared_nil {
     os.Error,
-    ini.ParseErr,
     CfgErr,
 }
 load_config :: proc(path: string) -> (cfg: Config, err: ConfigError) {
     cfg = {}
-    unwrap_parse_res :: proc(ini_cfg: ini.INI, res: ini.ParseResult) -> (ini.INI, ini.ParseErr) {
-        return ini_cfg, res.err
-    } 
-    cfg_float :: proc(cfg: ini.INI, name: string, not_prov: ConfigError, inv_err: ConfigError) -> (f64, ConfigError) {
+    iniiter, _ , cok  := ini.load_map_from_path(path, context.allocator)
+    if !cok do return {}, .CouldNotLoadConfig
+    ini_cfg := (map[string]map[string]string)(iniiter)
+    
+    cfg_float :: proc(cfg: map[string]map[string]string, name: string, not_prov: ConfigError, inv_err: ConfigError) -> (f64, ConfigError) {
         str, ok := cfg[""][name]
         if !ok do return 0, not_prov
         val := f64(0)
@@ -198,7 +199,7 @@ load_config :: proc(path: string) -> (cfg: Config, err: ConfigError) {
         if !ok do return 0, inv_err
         return val, nil
     }
-    cfg_bool :: proc(cfg: ini.INI, name: string, not_prov: ConfigError, inv_err: ConfigError) -> (bool, ConfigError) {
+    cfg_bool :: proc(cfg: map[string]map[string]string, name: string, not_prov: ConfigError, inv_err: ConfigError) -> (bool, ConfigError) {
         str, ok := cfg[""][name]
         if !ok do return false, not_prov
         val := false
@@ -206,7 +207,7 @@ load_config :: proc(path: string) -> (cfg: Config, err: ConfigError) {
         if !ok do return false, inv_err
         return val, nil
     }
-    cfg_int :: proc(cfg: ini.INI, name: string, not_prov: ConfigError, inv_err: ConfigError) -> (int, ConfigError) {
+    cfg_int :: proc(cfg: map[string]map[string]string, name: string, not_prov: ConfigError, inv_err: ConfigError) -> (int, ConfigError) {
         str, ok := cfg[""][name]
         if !ok do return 0, not_prov
         val := 0
@@ -214,10 +215,7 @@ load_config :: proc(path: string) -> (cfg: Config, err: ConfigError) {
         if !ok do return 0, inv_err
         return val, nil
     }
-    file := os.read_entire_file_from_filename_or_err(path) or_return
-    defer delete(file)
-    
-    ini_cfg := unwrap_parse_res(ini.parse(file)) or_return
+
     poll_rate_map := map[string]PollingRate {
         "125"  = .Hz125,
         "250"  = .Hz250,
@@ -258,7 +256,7 @@ load_config :: proc(path: string) -> (cfg: Config, err: ConfigError) {
 
     if deep_sleep_time < 1 || deep_sleep_time > 60 do return {}, .InvalidDeepSleepTime
     cfg.deep_sleep_time = deep_sleep_time
-    
+
     key_resp_time := cfg_int(ini_cfg, "key_response_time", .KeyRespTimeNotProvided, .InvalidKeyRespTime) or_return
 
     if key_resp_time < 4 || key_resp_time > 50 || key_resp_time % 2 != 0 do return {}, .InvalidKeyRespTime
@@ -266,9 +264,6 @@ load_config :: proc(path: string) -> (cfg: Config, err: ConfigError) {
 
     cfg.angle_snap     = cfg_bool(ini_cfg, "angle_snap", .AngleSnapNotProvided, .InvalidAngleSnap) or_return
     cfg.ripple_control = cfg_bool(ini_cfg, "ripple_control", .RippleControlNotProvided, .InvalidRippleControl) or_return
-
-    
-
 
 
     return cfg, nil
@@ -384,18 +379,18 @@ driver_main :: proc(opts: CliOptions , config: ^Config) -> DriverError {
 main :: proc () {
     opts: CliOptions = {}
     if len(os.args) == 1 {
-        flags.write_usage(os.stream_from_handle(os.stdout), typeid_of(CliOptions), os.args[0], .Odin)
+        flags.write_usage(os.to_stream(os.stdout), typeid_of(CliOptions), os.args[0], .Odin)
         return
     }
     flags.parse_or_exit(&opts, os.args, .Odin)
 
-    cfg := os.get_env("XDG_CONFIG_HOME")
+    cfg := os.get_env("XDG_CONFIG_HOME", context.allocator)
     if cfg == "" {
-        arr := [3]string{os.get_env("HOME"), ".config", "attack-shark-r1.ini"}
-        cfg = filepath.join(arr[:])
+        arr := [3]string{os.get_env("HOME", context.allocator), ".config", "attack-shark-r1.ini"}
+        cfg, _ = filepath.join(arr[:])
     } else {
         arr := [2]string{cfg, "attack-shark-r1.ini"}
-        cfg = filepath.join(arr[:])
+        cfg, _ = filepath.join(arr[:])
     }
     if opts.config_path != "" do cfg = opts.config_path
     if !os.exists(cfg) {
