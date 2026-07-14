@@ -29,3 +29,16 @@ ripple_control = false
 
 # Keep cursor movement aligned to horizontal and vertical directions.
 angle_snap = false
+
+# X11 LED effect. Accepted values: Disabled, Static, Breathing, Neon,
+# ColorBreathing, StaticDpi, or BreathingDpi. R1 ignores these LED settings.
+led_mode = "Disabled"
+
+# RGB color used by Static and Breathing modes.
+led_color = [0, 255, 0]
+
+# RGB color for each DPI stage, used by StaticDpi and BreathingDpi.
+dpi_colors = [[255, 0, 0], [0, 255, 0], [0, 255, 255], [255, 0, 0], [0, 255, 255], [64, 0, 255]]
+
+# LED animation speed from 1 (slowest) to 5 (fastest).
+led_speed = 3

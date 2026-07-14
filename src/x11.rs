@@ -5,14 +5,13 @@ use std::time::Duration;
 use hidapi::{HidApi, HidDevice};
 
 use crate::{
-    config::{Config, PollingRate},
+    config::{Config, LedMode, PollingRate},
     device::configuration_devices,
     error::{DriverError, Result},
 };
 
 const WIRED_PRODUCT_ID: u16 = 0xfa55;
 const WIRELESS_PRODUCT_ID: u16 = 0xfa60;
-const R1_WIRELESS_VERSION: u16 = 0x1105;
 const X11_WIRELESS_VERSION: u16 = 0x1108;
 const PACKET_DELAY: Duration = Duration::from_millis(300);
 
@@ -74,8 +73,7 @@ impl X11Device {
 }
 
 fn supports_x11_adapter(release_number: u16, allow_unknown_adapter: bool) -> bool {
-    release_number != R1_WIRELESS_VERSION
-        && (allow_unknown_adapter || release_number == X11_WIRELESS_VERSION)
+    allow_unknown_adapter || release_number == X11_WIRELESS_VERSION
 }
 
 fn polling_packet(rate: PollingRate) -> [u8; 9] {
@@ -91,14 +89,27 @@ fn polling_packet(rate: PollingRate) -> [u8; 9] {
 fn preferences_packet(config: &Config) -> [u8; 15] {
     let mut packet = [0_u8; 15];
     packet[0..3].copy_from_slice(&[0x05, 0x0f, 0x01]);
+    packet[3] = match config.led_mode {
+        LedMode::Disabled => 0,
+        LedMode::Static => 0x10,
+        LedMode::Breathing => 0x20,
+        LedMode::Neon => 0x30,
+        LedMode::ColorBreathing => 0x40,
+        LedMode::StaticDpi => 0x50,
+        LedMode::BreathingDpi => 0x60,
+    };
     let deep_sleep_bucket = (config.deep_sleep_time - 1) / 16;
-    // X11 default LED speed is 3, whose hardware encoding is also 3.
-    packet[4] = deep_sleep_bucket << 4 | 3;
+    packet[4] = deep_sleep_bucket << 4 | (6 - config.led_speed);
     packet[5] = 0x08_u8.wrapping_add(config.deep_sleep_time.wrapping_mul(16));
-    packet[6..9].copy_from_slice(&[0, 0xff, 0]);
+    packet[6..9].copy_from_slice(&config.led_color);
     packet[9] = (config.sleep_time * 2.0).round() as u8;
     packet[10] = (config.key_response_time - 4) / 2 + 2;
-    packet[11] = 1;
+    packet[11] = config
+        .led_color
+        .iter()
+        .filter(|channel| **channel >= 0x64)
+        .count() as u8
+        + u8::from(config.led_mode == LedMode::BreathingDpi);
     packet[12] = packet[3..=10]
         .iter()
         .fold(0_u8, |sum, byte| sum.wrapping_add(*byte));
@@ -126,6 +137,11 @@ fn dpi_packet(config: &Config) -> Result<[u8; 56]> {
     packet[6] = stage_mask;
     packet[7] = stage_mask;
     packet[24] = config.active_dpi;
+    for (index, color) in config.dpi_colors.iter().enumerate() {
+        packet[25 + index * 3..28 + index * 3].copy_from_slice(color);
+    }
+    // Continuous lighting follows in report 0x05; avoid the one-shot flash.
+    packet[49] = 0;
     let checksum = packet[3..=49]
         .iter()
         .fold(0_u16, |sum, byte| sum.wrapping_add(*byte as u16));
@@ -179,6 +195,17 @@ mod tests {
             key_response_time: 4,
             angle_snap: false,
             ripple_control: false,
+            led_mode: LedMode::Disabled,
+            led_color: [0, 255, 0],
+            dpi_colors: [
+                [255, 0, 0],
+                [0, 255, 0],
+                [0, 255, 255],
+                [255, 0, 0],
+                [0, 255, 255],
+                [64, 0, 255],
+            ],
+            led_speed: 3,
         }
     }
 
@@ -213,6 +240,28 @@ mod tests {
     }
 
     #[test]
+    fn encodes_documented_led_modes_without_overwriting_preferences() {
+        let mut config = config();
+        for (mode, value) in [
+            (LedMode::Breathing, 0x20),
+            (LedMode::Neon, 0x30),
+            (LedMode::ColorBreathing, 0x40),
+        ] {
+            config.led_mode = mode;
+            let packet = preferences_packet(&config);
+            assert_eq!(packet[3], value);
+            assert_eq!(packet[9], 12);
+            assert_eq!(packet[10], 2);
+            assert_eq!(
+                packet[12],
+                packet[3..=10]
+                    .iter()
+                    .fold(0_u8, |sum, byte| sum.wrapping_add(*byte))
+            );
+        }
+    }
+
+    #[test]
     fn builds_documented_dpi_packet() {
         let packet = dpi_packet(&config()).unwrap();
         assert_eq!(packet.len(), 56);
@@ -226,8 +275,8 @@ mod tests {
         assert_eq!(
             &packet[25..],
             &[
-                0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0xff, 0xff, 0, 0, 0xff, 0xff, 0xff, 0, 0xff,
-                0xff, 0x40, 0, 0xff, 0xff, 0xff, 2, 0x0f, 0x5a, 0, 0, 0, 0
+                0xff, 0, 0, 0, 0xff, 0, 0, 0xff, 0xff, 0xff, 0, 0, 0, 0xff, 0xff, 0x40, 0, 0xff,
+                0xff, 0x40, 0, 0xff, 0xff, 0xff, 0, 0x0e, 0x99, 0, 0, 0, 0
             ]
         );
     }
@@ -249,10 +298,30 @@ mod tests {
     }
 
     #[test]
-    fn never_opens_a_known_r1_adapter_as_x11() {
+    fn encodes_global_color_speed_and_stage_colors() {
+        let mut config = config();
+        config.led_mode = LedMode::Static;
+        config.led_color = [0x12, 0x80, 0xff];
+        config.led_speed = 5;
+        config.dpi_colors[2] = [1, 2, 3];
+
+        let preferences = preferences_packet(&config);
+        assert_eq!(preferences[3], 0x10);
+        assert_eq!(preferences[4] & 0x0f, 1);
+        assert_eq!(&preferences[6..9], &[0x12, 0x80, 0xff]);
+        assert_eq!(preferences[11], 2);
+
+        let dpis = dpi_packet(&config).unwrap();
+        assert_eq!(&dpis[31..34], &[1, 2, 3]);
+        assert_eq!(dpis[49], 0);
+    }
+
+    #[test]
+    fn manual_model_selection_allows_shared_adapter_revisions() {
         assert!(supports_x11_adapter(X11_WIRELESS_VERSION, false));
         assert!(supports_x11_adapter(0x1200, true));
         assert!(!supports_x11_adapter(0x1200, false));
-        assert!(!supports_x11_adapter(R1_WIRELESS_VERSION, true));
+        assert!(supports_x11_adapter(0x1105, true));
+        assert!(!supports_x11_adapter(0x1105, false));
     }
 }

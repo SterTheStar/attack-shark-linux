@@ -23,6 +23,7 @@ const MONITOR_RETRY_DELAY: Duration = Duration::from_secs(1);
 
 static BATTERY_MONITOR_STARTED: OnceLock<()> = OnceLock::new();
 static BATTERY_STATUS: OnceLock<Mutex<Option<BatteryStatus>>> = OnceLock::new();
+static BATTERY_MODEL_OVERRIDE: OnceLock<Mutex<Option<DeviceModel>>> = OnceLock::new();
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeviceModel {
@@ -46,7 +47,8 @@ pub struct DetectedDevice {
 #[derive(Clone, Copy)]
 struct BatteryStatus {
     model: DeviceModel,
-    charge: u8,
+    charge: Option<u8>,
+    active_dpi: Option<u8>,
 }
 
 pub struct MouseDevice {
@@ -101,6 +103,13 @@ impl DeviceService {
                     return Ok(Some(detected));
                 }
                 wireless_match = Some(detected);
+            } else if device.product_id() == WIRELESS_PRODUCT_ID {
+                // R1 and X11 receivers can report the same USB revision. A
+                // manually selected model must take precedence for fa60.
+                wireless_match = Some(DetectedDevice {
+                    model,
+                    connection: ConnectionMode::Wireless,
+                });
             } else if detected.model == DeviceModel::UnknownAdapter {
                 unknown_adapter = true;
             }
@@ -114,7 +123,13 @@ impl DeviceService {
         }))
     }
 
-    pub fn start_battery_monitor() {
+    pub fn start_battery_monitor(model_override: Option<DeviceModel>) {
+        if let Ok(mut selected) = BATTERY_MODEL_OVERRIDE
+            .get_or_init(|| Mutex::new(None))
+            .lock()
+        {
+            *selected = model_override;
+        }
         BATTERY_MONITOR_STARTED.get_or_init(|| {
             BATTERY_STATUS.get_or_init(|| Mutex::new(None));
             std::thread::Builder::new()
@@ -133,6 +148,16 @@ impl DeviceService {
             .and_then(|status| status.lock().ok())
             .and_then(|status| status.as_ref().copied())
             .and_then(|status| (status.model == detected.model).then_some(status.charge))
+            .flatten()
+    }
+
+    pub fn monitored_active_dpi(detected: DetectedDevice) -> Option<u8> {
+        BATTERY_STATUS
+            .get()
+            .and_then(|status| status.lock().ok())
+            .and_then(|status| status.as_ref().copied())
+            .and_then(|status| (status.model == detected.model).then_some(status.active_dpi))
+            .flatten()
     }
 }
 
@@ -169,13 +194,29 @@ fn monitor_battery_reports() {
         while let Ok(transferred) =
             device.read_timeout(&mut report, READ_TIMEOUT.as_millis() as i32)
         {
-            if let Some(charge) = battery_charge_from_report(detected.model, &report[..transferred])
-                && let Some(mut status) = BATTERY_STATUS.get().and_then(|status| status.lock().ok())
-            {
-                *status = Some(BatteryStatus {
-                    model: detected.model,
-                    charge,
-                });
+            let model = BATTERY_MODEL_OVERRIDE
+                .get()
+                .and_then(|selected| selected.lock().ok())
+                .and_then(|selected| *selected)
+                .unwrap_or(detected.model);
+            if let Some(mut status) = BATTERY_STATUS.get().and_then(|status| status.lock().ok()) {
+                if let Some(charge) = battery_charge_from_report(model, &report[..transferred]) {
+                    let active_dpi = status.as_ref().and_then(|status| status.active_dpi);
+                    *status = Some(BatteryStatus {
+                        model,
+                        charge: Some(charge),
+                        active_dpi,
+                    });
+                } else if model == DeviceModel::X11
+                    && let Some(active_dpi) = x11_active_dpi_from_report(&report[..transferred])
+                {
+                    let charge = status.as_ref().and_then(|status| status.charge);
+                    *status = Some(BatteryStatus {
+                        model,
+                        charge,
+                        active_dpi: Some(active_dpi),
+                    });
+                }
             }
         }
         clear_battery_status();
@@ -200,6 +241,11 @@ fn battery_charge_from_report(model: DeviceModel, report: &[u8]) -> Option<u8> {
         }
         _ => None,
     }
+}
+
+fn x11_active_dpi_from_report(report: &[u8]) -> Option<u8> {
+    let active_dpi = *report.get(3)?;
+    (report.starts_with(&[0x03, 0x55, 0x10]) && (1..=6).contains(&active_dpi)).then_some(active_dpi)
 }
 
 impl MouseDevice {
@@ -406,5 +452,9 @@ mod tests {
             battery_charge_from_report(DeviceModel::X11, &[3, 0, 0, 0, 73]),
             None
         );
+        assert_eq!(x11_active_dpi_from_report(&[3, 0x55, 0x10, 4, 0]), Some(4));
+        assert_eq!(x11_active_dpi_from_report(&[3, 0x55, 0x10, 7, 0]), None);
+        assert_eq!(x11_active_dpi_from_report(&[]), None);
+        assert_eq!(x11_active_dpi_from_report(&[3, 0x55, 0x10]), None);
     }
 }

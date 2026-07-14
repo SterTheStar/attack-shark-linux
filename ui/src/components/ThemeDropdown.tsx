@@ -4,10 +4,12 @@ export function ThemeDropdown<T extends string>({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   value: T;
   options: readonly { value: T; label: string }[];
   onChange: (value: T) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -22,7 +24,7 @@ export function ThemeDropdown<T extends string>({
   }, []);
 
   return <div className="theme-dropdown" ref={root}>
-    <button type="button" className="theme-dropdown-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)} onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}>
+    <button type="button" disabled={disabled} className="theme-dropdown-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)} onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}>
       <span>{selected}</span>
     </button>
     {open && <div className="theme-dropdown-options" role="listbox">

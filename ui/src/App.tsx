@@ -11,9 +11,10 @@ import { ConnectionIndicator } from "./components/ConnectionIndicator";
 import { PermissionWarning } from "./components/PermissionWarning";
 import { SettingsModal } from "./components/SettingsModal";
 import { ThemeCheckbox } from "./components/ThemeCheckbox";
+import { ThemeDropdown } from "./components/ThemeDropdown";
 import { ThemeNumberInput } from "./components/ThemeNumberInput";
 import { translations, type Translation } from "./i18n";
-import type { ApplyResult, Config, ConnectionMode, DeviceModel, DeviceStatus, Language, MouseSelection, PollingRate, UdevRuleStatus } from "./types";
+import type { ApplyResult, Config, ConnectionMode, DeviceModel, DeviceStatus, Language, LedMode, MouseSelection, PollingRate, UdevRuleStatus } from "./types";
 
 const LANGUAGE_KEY = "attack-shark.language";
 const MODEL_KEY = "attack-shark.mouse-selection";
@@ -29,6 +30,10 @@ const defaultConfig: Config = {
   key_response_time: 4,
   angle_snap: false,
   ripple_control: false,
+  led_mode: "Disabled",
+  led_color: [0, 255, 0],
+  dpi_colors: [[255, 0, 0], [0, 255, 0], [0, 255, 255], [255, 0, 0], [0, 255, 255], [64, 0, 255]],
+  led_speed: 3,
 };
 
 export function App() {
@@ -49,18 +54,19 @@ export function App() {
   const canConfigure = connectionMode !== "unknown" && udevRule?.installed === true;
 
   useEffect(() => {
-    invoke<Config>("load_config").then(setConfig).catch(() => setNotice("Using local defaults"));
-  }, []);
+    invoke<Config>("load_config").then((savedConfig) => { setConfig(savedConfig); setNotice(t.savedSettingsLoaded); }).catch(() => setNotice(t.usingLocalDefaults));
+  }, [t.savedSettingsLoaded, t.usingLocalDefaults]);
 
   useEffect(() => {
     if (isApplying) return;
     const refreshDeviceStatus = () => {
       invoke<DeviceStatus>("device_status", { modelOverride: selection === "auto" ? null : selection })
-        .then(({ model, mode, battery_charge, udev_rule }) => {
+        .then(({ model, mode, battery_charge, active_dpi, udev_rule }) => {
           setDeviceModel(model);
           setConnectionMode(mode);
           setBattery(battery_charge);
           setUdevRule(udev_rule);
+          if (model === "x11" && active_dpi) setConfig((current) => current.active_dpi === active_dpi ? current : { ...current, active_dpi });
         })
         .catch(() => {
           setDeviceModel("unknown");
@@ -159,6 +165,7 @@ export function App() {
         <aside className="right-column">
           <Panel title={t.dpiSettings}><DpiEditor config={config} model={deviceModel} update={update} deferUpdate={deferUpdate} commitUpdate={commitUpdate} disabled={!canConfigure} /></Panel>
           <Panel title={t.pollingRate}><PollingControl value={config.polling_rate} update={(value) => update("polling_rate", value)} disabled={!canConfigure} /></Panel>
+          {deviceModel === "x11" && <Panel title={t.ledEffect}><LedControl config={config} update={update} commitUpdate={commitUpdate} disabled={!canConfigure} t={t} /></Panel>}
         </aside>
       </section>
       <footer className="app-footer">Made with &lt;3 by <button onClick={() => void openUrl("https://x.com/onlysterbr").catch(console.error)}>Esther</button></footer>
@@ -181,13 +188,22 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 
 function DpiEditor({ config, model, update, deferUpdate, commitUpdate, disabled }: { config: Config; model: DeviceModel; update: <K extends keyof Config>(key: K, value: Config[K]) => void; deferUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; commitUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; disabled: boolean }) {
   const isX11 = model === "x11";
-  return <div className={`dpi-editor${disabled ? " is-disabled" : ""}`}>{config.dpis.map((dpi, index) => <label className="dpi-row" key={index}><ThemeCheckbox disabled={disabled} checked={config.active_dpi === index + 1} onCheckedChange={(checked) => { if (checked) update("active_dpi", index + 1); }} /><span>DPI {index + 1}</span><ThemeNumberInput disabled={disabled} min={isX11 ? 50 : 100} max={isX11 ? 22000 : 18000} step={isX11 ? 50 : 100} value={dpi} onValueChange={(value) => { const dpis = [...config.dpis]; dpis[index] = value; deferUpdate("dpis", dpis); }} onBlur={(value) => { const dpis = [...config.dpis]; dpis[index] = value; commitUpdate("dpis", dpis); }} /></label>)}</div>;
+  return <div className={`dpi-editor${disabled ? " is-disabled" : ""}`}>{config.dpis.map((dpi, index) => <label className={`dpi-row${isX11 ? " has-color" : ""}`} key={index}><ThemeCheckbox disabled={disabled} checked={config.active_dpi === index + 1} onCheckedChange={(checked) => { if (checked) update("active_dpi", index + 1); }} />{isX11 && <input className="dpi-color" aria-label={`DPI ${index + 1} color`} disabled={disabled} type="color" value={rgbToHex(config.dpi_colors[index])} onChange={(event) => { const colors = config.dpi_colors.map((color) => [...color]) as Config["dpi_colors"]; colors[index] = hexToRgb(event.target.value); update("dpi_colors", colors); }} />}<span>DPI {index + 1}</span><ThemeNumberInput disabled={disabled} min={isX11 ? 50 : 100} max={isX11 ? 22000 : 18000} step={isX11 && dpi < 10000 ? 50 : 100} value={dpi} onValueChange={(value) => { const dpis = [...config.dpis]; dpis[index] = value; deferUpdate("dpis", dpis); }} onBlur={(value) => { const dpis = [...config.dpis]; dpis[index] = value; commitUpdate("dpis", dpis); }} /></label>)}</div>;
 }
 
 function PollingControl({ value, update, disabled }: { value: PollingRate; update: (value: PollingRate) => void; disabled: boolean }) {
   const options: { value: PollingRate; label: string }[] = [{ value: "Hz125", label: "125Hz" }, { value: "Hz250", label: "250Hz" }, { value: "Hz500", label: "500Hz" }, { value: "Hz1000", label: "1000Hz" }];
   return <div className={`polling-control${disabled ? " is-disabled" : ""}`}><div className="polling-wheel">{options.map((option) => <button key={option.value} disabled={disabled} className={value === option.value ? "active" : ""} onClick={() => update(option.value)}>{option.label}</button>)}<div className="wheel-center">E-sports</div></div></div>;
 }
+
+function LedControl({ config, update, commitUpdate, disabled, t }: { config: Config; update: <K extends keyof Config>(key: K, value: Config[K]) => void; commitUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; disabled: boolean; t: Translation }) {
+  const usesColor = config.led_mode === "Static" || config.led_mode === "Breathing";
+  const usesSpeed = ["Breathing", "Neon", "ColorBreathing", "BreathingDpi"].includes(config.led_mode);
+  return <div className={`led-control${disabled ? " is-disabled" : ""}`}><ThemeDropdown disabled={disabled} value={config.led_mode} onChange={(value) => update("led_mode", value)} options={[{ value: "Disabled", label: t.ledDisabled }, { value: "Static", label: t.ledStatic }, { value: "Breathing", label: t.ledBreathing }, { value: "Neon", label: t.ledNeon }, { value: "ColorBreathing", label: t.ledColorBreathing }, { value: "StaticDpi", label: t.ledStaticDpi }, { value: "BreathingDpi", label: t.ledBreathingDpi }]} />{usesColor && <label className="led-color-row"><span>{t.ledColor}</span><input disabled={disabled} type="color" value={rgbToHex(config.led_color)} onChange={(event) => update("led_color", hexToRgb(event.target.value))} /></label>}{usesSpeed && <div className="led-speed"><span>{t.ledSpeed}</span><ThemeNumberInput disabled={disabled} min={1} max={5} step={1} value={config.led_speed} onValueChange={(value) => update("led_speed", value)} onBlur={(value) => commitUpdate("led_speed", value)} /></div>}{(config.led_mode === "StaticDpi" || config.led_mode === "BreathingDpi") && <small>{t.ledUsesDpiColor}</small>}</div>;
+}
+
+function rgbToHex(color: number[]) { return `#${color.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`; }
+function hexToRgb(value: string): [number, number, number] { return [Number.parseInt(value.slice(1, 3), 16), Number.parseInt(value.slice(3, 5), 16), Number.parseInt(value.slice(5, 7), 16)]; }
 
 function Settings({ config, update, previewUpdate, deferUpdate, commitUpdate, t, disabled }: { config: Config; update: <K extends keyof Config>(key: K, value: Config[K]) => void; previewUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; deferUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; commitUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; t: Translation; disabled: boolean }) {
   return <div className={`settings${disabled ? " is-disabled" : ""}`}><Range label={t.sleepTime} value={config.sleep_time} min={0.5} max={30} step={0.5} suffix=" min" disabled={disabled} onChange={(value) => previewUpdate("sleep_time", value)} onCommit={(value) => commitUpdate("sleep_time", value)} /><Range label={t.keyResponse} value={config.key_response_time} min={4} max={50} step={2} suffix=" ms" disabled={disabled} onChange={(value) => previewUpdate("key_response_time", value)} onCommit={(value) => commitUpdate("key_response_time", value)} /><Range label={t.deepSleepTime} value={config.deep_sleep_time} min={1} max={60} step={1} suffix=" min" disabled={disabled} onChange={(value) => previewUpdate("deep_sleep_time", value)} onCommit={(value) => commitUpdate("deep_sleep_time", value)} /><Toggle label={t.rippleControl} checked={config.ripple_control} disabled={disabled} onChange={(value) => update("ripple_control", value)} /><Toggle label={t.angleSnap} checked={config.angle_snap} disabled={disabled} onChange={(value) => update("angle_snap", value)} /></div>;

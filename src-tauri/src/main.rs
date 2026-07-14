@@ -8,6 +8,7 @@ struct DeviceStatus {
     model: &'static str,
     mode: &'static str,
     battery_charge: Option<u8>,
+    active_dpi: Option<u8>,
     udev_rule: UdevRuleStatus,
 }
 
@@ -53,6 +54,11 @@ fn apply_config(config: Config, model_override: Option<String>) -> Result<ApplyR
             apply_r1_config(&mut mouse, &config, &mut skipped);
         }
         DeviceModel::X11 => {
+            config
+                .dpis
+                .iter()
+                .try_for_each(|dpi| Config::validate_x11_dpi(*dpi))
+                .map_err(|error| error.to_string())?;
             let mut mouse = X11Device::open(model_override.as_deref() == Some("x11"))
                 .map_err(|error| error.to_string())?;
             apply_x11_config(&mut mouse, &config, &mut skipped);
@@ -61,6 +67,8 @@ fn apply_config(config: Config, model_override: Option<String>) -> Result<ApplyR
             return Err("the wireless adapter model is ambiguous; connect the mouse by cable once to identify it".into());
         }
     }
+
+    Config::save(&config, default_config_path()).map_err(|error| error.to_string())?;
 
     Ok(ApplyResult { skipped })
 }
@@ -129,13 +137,13 @@ fn apply_x11_config(mouse: &mut X11Device, config: &Config, skipped: &mut Vec<St
         eprintln!("X11 polling rate failed: {error:?}");
         skipped.push(format!("polling rate: {error}"));
     }
-    if let Err(error) = mouse.set_preferences(config) {
-        eprintln!("X11 preferences failed: {error:?}");
-        skipped.push(format!("preferences: {error}"));
-    }
     if let Err(error) = mouse.set_dpis(config) {
         eprintln!("X11 DPI options failed: {error:?}");
         skipped.push(format!("DPI options: {error}"));
+    }
+    if let Err(error) = mouse.set_preferences(config) {
+        eprintln!("X11 preferences failed: {error:?}");
+        skipped.push(format!("preferences: {error}"));
     }
 }
 
@@ -166,12 +174,14 @@ fn device_status(model_override: Option<String>) -> Result<DeviceStatus, String>
         attack_shark::ConnectionMode::Wired => "wired",
         attack_shark::ConnectionMode::Wireless => "wireless",
     });
-    DeviceService::start_battery_monitor();
+    DeviceService::start_battery_monitor(selected_model);
     let battery_charge = detected.and_then(DeviceService::monitored_battery);
+    let active_dpi = detected.and_then(DeviceService::monitored_active_dpi);
     Ok(DeviceStatus {
         model: model_name,
         mode,
         battery_charge,
+        active_dpi,
         udev_rule: udev_rule_status(model, detected.map(|detected| detected.connection)),
     })
 }
@@ -234,7 +244,7 @@ fn default_config_path() -> PathBuf {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
         .map(|path| path.join("attack-shark/config.toml"));
-    if let Some(path) = user_config.filter(|path| path.exists()) {
+    if let Some(path) = user_config {
         return path;
     }
 

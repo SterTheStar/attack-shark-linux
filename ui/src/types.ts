@@ -1,4 +1,5 @@
 export type PollingRate = "Hz125" | "Hz250" | "Hz500" | "Hz1000";
+export type LedMode = "Disabled" | "Static" | "Breathing" | "Neon" | "ColorBreathing" | "StaticDpi" | "BreathingDpi";
 export type ConnectionMode = "wired" | "wireless" | "unknown";
 export type DeviceModel = "r1" | "x11" | "adapter" | "unknown";
 export type MouseSelection = "auto" | "r1" | "x11";
@@ -13,6 +14,10 @@ export type Config = {
   key_response_time: number;
   angle_snap: boolean;
   ripple_control: boolean;
+  led_mode: LedMode;
+  led_color: [number, number, number];
+  dpi_colors: [number[], number[], number[], number[], number[], number[]];
+  led_speed: number;
 };
 
 export type UdevRuleStatus = {
@@ -25,6 +30,7 @@ export type DeviceStatus = {
   model: Exclude<DeviceModel, "unknown">;
   mode: ConnectionMode;
   battery_charge: number | null;
+  active_dpi: number | null;
   udev_rule: UdevRuleStatus;
 };
 

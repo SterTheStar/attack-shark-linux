@@ -623,6 +623,30 @@ button {
 	font-size: 10px;
 }
 
+.dpi-row.has-color {
+	grid-template-columns: 14px 18px 38px 1fr;
+}
+
+.dpi-color,
+.led-color-row input {
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	border: 1px solid #454545;
+	background: #090909;
+	cursor: pointer;
+}
+
+.dpi-color::-webkit-color-swatch-wrapper,
+.led-color-row input::-webkit-color-swatch-wrapper {
+	padding: 2px;
+}
+
+.dpi-color::-webkit-color-swatch,
+.led-color-row input::-webkit-color-swatch {
+	border: 0;
+}
+
 .theme-checkbox {
 	position: relative;
 	width: 13px;
@@ -811,6 +835,33 @@ button {
 .settings {
 	display: grid;
 	gap: 10px;
+}
+
+.led-control {
+	display: grid;
+	gap: 10px;
+}
+
+.led-color-row,
+.led-speed {
+	display: grid;
+	grid-template-columns: 1fr 74px;
+	align-items: center;
+	gap: 8px;
+	color: #b8b8b8;
+	font-size: 10px;
+}
+
+.led-color-row input {
+	justify-self: end;
+	width: 74px;
+	height: 28px;
+}
+
+.led-control small {
+	color: #888;
+	font-size: 9px;
+	line-height: 1.4;
 }
 
 .range-control>div:first-child {
