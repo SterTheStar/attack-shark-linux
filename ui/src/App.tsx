@@ -15,6 +15,7 @@ import type { ApplyResult, Config, ConnectionMode, DeviceModel, DeviceStatus, La
 
 const LANGUAGE_KEY = "attack-shark.language";
 const MODEL_KEY = "attack-shark.mouse-selection";
+const MINIMUM_APPLY_DURATION = 2000;
 
 const defaultConfig: Config = {
   polling_rate: "Hz500",
@@ -70,6 +71,7 @@ export function App() {
   }, [isApplying, selection]);
 
   const apply = async (nextConfig: Config) => {
+    const startedAt = Date.now();
     setIsApplying(true);
     setNotice("Applying settings...");
     try {
@@ -79,17 +81,43 @@ export function App() {
       console.error("Failed to apply mouse configuration:", error);
       setNotice(String(error));
     } finally {
+      const remaining = MINIMUM_APPLY_DURATION - (Date.now() - startedAt);
+      if (remaining > 0) await new Promise((resolve) => window.setTimeout(resolve, remaining));
       setIsApplying(false);
     }
   };
 
-  const update = <K extends keyof Config>(key: K, value: Config[K]) => {
+  const scheduleApply = (nextConfig: Config, delay: number) => {
+    clearTimeout(applyTimer.current);
+    setNotice(t.applyingChanges);
+    applyTimer.current = setTimeout(() => void apply(nextConfig), delay);
+  };
+
+  const setConfigValue = <K extends keyof Config>(key: K, value: Config[K]) => {
     if (isApplying || !canConfigure) return;
     const nextConfig = { ...config, [key]: value } as Config;
     setConfig(nextConfig);
-    setNotice(t.applyingChanges);
-    clearTimeout(applyTimer.current);
-    applyTimer.current = setTimeout(() => void apply(nextConfig), 350);
+    return nextConfig;
+  };
+
+  const update = <K extends keyof Config>(key: K, value: Config[K]) => {
+    const nextConfig = setConfigValue(key, value);
+    if (nextConfig) scheduleApply(nextConfig, 350);
+  };
+
+  const previewUpdate = <K extends keyof Config>(key: K, value: Config[K]) => {
+    const nextConfig = setConfigValue(key, value);
+    if (nextConfig) clearTimeout(applyTimer.current);
+  };
+
+  const deferUpdate = <K extends keyof Config>(key: K, value: Config[K]) => {
+    const nextConfig = setConfigValue(key, value);
+    if (nextConfig) scheduleApply(nextConfig, 3000);
+  };
+
+  const commitUpdate = <K extends keyof Config>(key: K, value: Config[K]) => {
+    const nextConfig = setConfigValue(key, value);
+    if (nextConfig) scheduleApply(nextConfig, 0);
   };
 
   return (
@@ -114,7 +142,7 @@ export function App() {
           <Panel title={t.power}>
             <div className="battery-wrap"><div className="battery"><div style={{ width: `${battery ?? 0}%` }} /></div><strong>{battery === null ? "—" : `${battery}%`}</strong></div>
           </Panel>
-          <Panel title={t.mouseAttributes}><Settings config={config} update={update} t={t} disabled={!canConfigure} /></Panel>
+          <Panel title={t.mouseAttributes}><Settings config={config} update={update} previewUpdate={previewUpdate} deferUpdate={deferUpdate} commitUpdate={commitUpdate} t={t} disabled={!canConfigure} /></Panel>
         </aside>
 
         <section className="mouse-stage">
@@ -124,7 +152,7 @@ export function App() {
         </section>
 
         <aside className="right-column">
-          <Panel title={t.dpiSettings}><DpiEditor config={config} model={deviceModel} update={update} disabled={!canConfigure} /></Panel>
+          <Panel title={t.dpiSettings}><DpiEditor config={config} model={deviceModel} update={update} deferUpdate={deferUpdate} commitUpdate={commitUpdate} disabled={!canConfigure} /></Panel>
           <Panel title={t.pollingRate}><PollingControl value={config.polling_rate} update={(value) => update("polling_rate", value)} disabled={!canConfigure} /></Panel>
         </aside>
       </section>
@@ -146,9 +174,9 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   return <section className="panel"><h2><span>{title}</span><button className="panel-toggle" aria-label={expanded ? `Collapse ${title}` : `Expand ${title}`} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "−" : "+"}</button></h2>{expanded && <div className="panel-content">{children}</div>}</section>;
 }
 
-function DpiEditor({ config, model, update, disabled }: { config: Config; model: DeviceModel; update: <K extends keyof Config>(key: K, value: Config[K]) => void; disabled: boolean }) {
+function DpiEditor({ config, model, update, deferUpdate, commitUpdate, disabled }: { config: Config; model: DeviceModel; update: <K extends keyof Config>(key: K, value: Config[K]) => void; deferUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; commitUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; disabled: boolean }) {
   const isX11 = model === "x11";
-  return <div className={`dpi-editor${disabled ? " is-disabled" : ""}`}>{config.dpis.map((dpi, index) => <label className="dpi-row" key={index}><ThemeCheckbox disabled={disabled} checked={config.active_dpi === index + 1} onCheckedChange={(checked) => { if (checked) update("active_dpi", index + 1); }} /><span>DPI {index + 1}</span><input type="number" disabled={disabled} min={isX11 ? "50" : "100"} max={isX11 ? "22000" : "18000"} step={isX11 ? "50" : "100"} value={dpi} onChange={(event) => { const dpis = [...config.dpis]; dpis[index] = Number(event.target.value); update("dpis", dpis); }} /></label>)}</div>;
+  return <div className={`dpi-editor${disabled ? " is-disabled" : ""}`}>{config.dpis.map((dpi, index) => <label className="dpi-row" key={index}><ThemeCheckbox disabled={disabled} checked={config.active_dpi === index + 1} onCheckedChange={(checked) => { if (checked) update("active_dpi", index + 1); }} /><span>DPI {index + 1}</span><input type="number" disabled={disabled} min={isX11 ? "50" : "100"} max={isX11 ? "22000" : "18000"} step={isX11 ? "50" : "100"} value={dpi} onChange={(event) => { const dpis = [...config.dpis]; dpis[index] = Number(event.target.value); deferUpdate("dpis", dpis); }} onBlur={(event) => { const dpis = [...config.dpis]; dpis[index] = Number(event.currentTarget.value); commitUpdate("dpis", dpis); }} /></label>)}</div>;
 }
 
 function PollingControl({ value, update, disabled }: { value: PollingRate; update: (value: PollingRate) => void; disabled: boolean }) {
@@ -156,12 +184,12 @@ function PollingControl({ value, update, disabled }: { value: PollingRate; updat
   return <div className={`polling-control${disabled ? " is-disabled" : ""}`}><div className="polling-wheel">{options.map((option) => <button key={option.value} disabled={disabled} className={value === option.value ? "active" : ""} onClick={() => update(option.value)}>{option.label}</button>)}<div className="wheel-center">E-sports</div></div></div>;
 }
 
-function Settings({ config, update, t, disabled }: { config: Config; update: <K extends keyof Config>(key: K, value: Config[K]) => void; t: Translation; disabled: boolean }) {
-  return <div className={`settings${disabled ? " is-disabled" : ""}`}><Range label={t.sleepTime} value={config.sleep_time} min={0.5} max={30} step={0.5} suffix=" min" disabled={disabled} onChange={(value) => update("sleep_time", value)} /><Range label={t.keyResponse} value={config.key_response_time} min={4} max={50} step={2} suffix=" ms" disabled={disabled} onChange={(value) => update("key_response_time", value)} /><Range label={t.deepSleepTime} value={config.deep_sleep_time} min={1} max={60} step={1} suffix=" min" disabled={disabled} onChange={(value) => update("deep_sleep_time", value)} /><Toggle label={t.rippleControl} checked={config.ripple_control} disabled={disabled} onChange={(value) => update("ripple_control", value)} /><Toggle label={t.angleSnap} checked={config.angle_snap} disabled={disabled} onChange={(value) => update("angle_snap", value)} /></div>;
+function Settings({ config, update, previewUpdate, deferUpdate, commitUpdate, t, disabled }: { config: Config; update: <K extends keyof Config>(key: K, value: Config[K]) => void; previewUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; deferUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; commitUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; t: Translation; disabled: boolean }) {
+  return <div className={`settings${disabled ? " is-disabled" : ""}`}><Range label={t.sleepTime} value={config.sleep_time} min={0.5} max={30} step={0.5} suffix=" min" disabled={disabled} onChange={(value) => previewUpdate("sleep_time", value)} onCommit={(value) => commitUpdate("sleep_time", value)} /><Range label={t.keyResponse} value={config.key_response_time} min={4} max={50} step={2} suffix=" ms" disabled={disabled} onChange={(value) => previewUpdate("key_response_time", value)} onCommit={(value) => commitUpdate("key_response_time", value)} /><Range label={t.deepSleepTime} value={config.deep_sleep_time} min={1} max={60} step={1} suffix=" min" disabled={disabled} onChange={(value) => previewUpdate("deep_sleep_time", value)} onCommit={(value) => commitUpdate("deep_sleep_time", value)} /><Toggle label={t.rippleControl} checked={config.ripple_control} disabled={disabled} onChange={(value) => update("ripple_control", value)} /><Toggle label={t.angleSnap} checked={config.angle_snap} disabled={disabled} onChange={(value) => update("angle_snap", value)} /></div>;
 }
 
-function Range({ label, value, min, max, step, suffix, disabled, onChange }: { label: string; value: number; min: number; max: number; step: number; suffix: string; disabled: boolean; onChange: (value: number) => void }) {
-  return <div className="range-control"><div><span>{label}</span><b>{value}{suffix}</b></div><Slider.Root className="slider" disabled={disabled} value={[value]} min={min} max={max} step={step} onValueChange={([next]) => onChange(next)}><Slider.Track className="slider-track"><Slider.Range className="slider-range" /></Slider.Track><Slider.Thumb className="slider-thumb" /></Slider.Root></div>;
+function Range({ label, value, min, max, step, suffix, disabled, onChange, onCommit }: { label: string; value: number; min: number; max: number; step: number; suffix: string; disabled: boolean; onChange: (value: number) => void; onCommit: (value: number) => void }) {
+  return <div className="range-control"><div><span>{label}</span><b>{value}{suffix}</b></div><Slider.Root className="slider" disabled={disabled} value={[value]} min={min} max={max} step={step} onValueChange={([next]) => onChange(next)} onValueCommit={([next]) => onCommit(next)}><Slider.Track className="slider-track"><Slider.Range className="slider-range" /></Slider.Track><Slider.Thumb className="slider-thumb" /></Slider.Root></div>;
 }
 
 function Toggle({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled: boolean; onChange: (value: boolean) => void }) {
