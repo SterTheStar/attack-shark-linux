@@ -50,11 +50,18 @@ export function App() {
   const [onboarding, setOnboarding] = useState(() => !localStorage.getItem(MODEL_KEY));
   const [betaNoticeAccepted, setBetaNoticeAccepted] = useState(() => localStorage.getItem(BETA_NOTICE_KEY) === "true");
   const applyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const t = translations[language];
   const canConfigure = connectionMode !== "unknown" && udevRule?.installed === true;
 
+  const showNotice = (message: string, duration = 3500) => {
+    clearTimeout(noticeTimer.current);
+    setNotice(message);
+    noticeTimer.current = setTimeout(() => setNotice(""), duration);
+  };
+
   useEffect(() => {
-    invoke<Config>("load_config").then((savedConfig) => { setConfig(savedConfig); setNotice(t.savedSettingsLoaded); }).catch(() => setNotice(t.usingLocalDefaults));
+    invoke<Config>("load_config").then((savedConfig) => { setConfig(savedConfig); }).catch(() => showNotice(t.usingLocalDefaults));
   }, [t.savedSettingsLoaded, t.usingLocalDefaults]);
 
   useEffect(() => {
@@ -86,10 +93,10 @@ export function App() {
     setNotice("Applying settings...");
     try {
       const result = await invoke<ApplyResult>("apply_config", { config: nextConfig, modelOverride: selection === "auto" ? null : selection });
-      setNotice(result.skipped.length === 0 ? t.settingsApplied : `${t.skipped} ${result.skipped.join(", ")}`);
+       showNotice(result.skipped.length === 0 ? t.settingsApplied : `${t.skipped} ${result.skipped.join(", ")}`);
     } catch (error) {
       console.error("Failed to apply mouse configuration:", error);
-      setNotice(String(error));
+      showNotice(String(error), 6000);
     } finally {
       const remaining = MINIMUM_APPLY_DURATION - (Date.now() - startedAt);
       if (remaining > 0) await new Promise((resolve) => window.setTimeout(resolve, remaining));
@@ -99,7 +106,7 @@ export function App() {
 
   const scheduleApply = (nextConfig: Config, delay: number) => {
     clearTimeout(applyTimer.current);
-    setNotice(t.applyingChanges);
+    showNotice(t.applyingChanges);
     applyTimer.current = setTimeout(() => void apply(nextConfig), delay);
   };
 
@@ -160,7 +167,7 @@ export function App() {
         <section className="mouse-stage">
           <MouseDiagram />
           <p className="device-model">{deviceModelLabel(deviceModel, connectionMode, t)}</p>
-          <p className="status-notice" role="status">{notice}</p>
+          <p className={`status-notice${notice ? " is-visible" : ""}`} role="status">{notice || "\u00a0"}</p>
         </section>
 
         <aside className="right-column">
