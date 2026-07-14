@@ -1,5 +1,5 @@
 {
-  description = "Linux driver for Attack Shark R1 mouse";
+  description = "Linux driver for Attack Shark mice";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -12,33 +12,19 @@
         pkgs = import nixpkgs { inherit system; };
       in
       {
-        packages.default = pkgs.stdenv.mkDerivation {
-          pname = "attack-shark-r1-driver";
+        packages.default = pkgs.rustPlatform.buildRustPackage {
+          pname = "attack-shark";
           version = "1.0.0";
 
           src = ./.;
 
-          buildInputs = with pkgs; [ libusb1 ];
-
-          nativeBuildInputs = with pkgs; [
-            odin
-          ];
-
-          dontConfigure = true;
-
-          buildPhase = ''
-            runHook preBuild
-            
-            odin build . -o:speed -out:attack-shark-r1-driver
-
-            runHook postBuild
-          '';
+          cargoLock.lockFile = ./Cargo.lock;
 
           installPhase = ''
             runHook preInstall
             
             mkdir -p $out/bin
-            cp attack-shark-r1-driver $out/bin/
+            cp target/release/attack-shark $out/bin/
             mkdir -p $out/etc/udev/rules.d
             cp ./99-attack-shark-r1.rules  $out/etc/udev/rules.d
 
@@ -48,8 +34,9 @@
 
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            odin
-            ols 
+            cargo
+            rustc
+            rust-analyzer
           ];
         };
       }

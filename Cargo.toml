@@ -1,0 +1,12 @@
+[package]
+name = "attack-shark"
+version = "1.0.1"
+edition = "2024"
+description = "Linux userspace driver for Attack Shark mice"
+license = "MIT"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+rusb = { version = "0.9", features = ["vendored"] }
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
