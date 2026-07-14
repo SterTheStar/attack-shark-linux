@@ -2,12 +2,14 @@ import * as Slider from "@radix-ui/react-slider";
 import * as Switch from "@radix-ui/react-switch";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import logoImage from "./assets/attack-shark-logo.webp";
 import mouseImage from "./assets/attack-shark.webp";
 import { ConnectionIndicator } from "./components/ConnectionIndicator";
 import { PermissionWarning } from "./components/PermissionWarning";
 import { SettingsModal } from "./components/SettingsModal";
+import { ThemeCheckbox } from "./components/ThemeCheckbox";
 import { translations, type Translation } from "./i18n";
 import type { ApplyResult, Config, ConnectionMode, DeviceModel, DeviceStatus, Language, MouseSelection, PollingRate, UdevRuleStatus } from "./types";
 
@@ -126,6 +128,7 @@ export function App() {
           <Panel title={t.pollingRate}><PollingControl value={config.polling_rate} update={(value) => update("polling_rate", value)} disabled={!canConfigure} /></Panel>
         </aside>
       </section>
+      <footer className="app-footer">Made with &lt;3 by <button onClick={() => void openUrl("https://x.com/onlysterbr").catch(console.error)}>Esther</button></footer>
     </main>
   );
 }
@@ -145,7 +148,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 
 function DpiEditor({ config, model, update, disabled }: { config: Config; model: DeviceModel; update: <K extends keyof Config>(key: K, value: Config[K]) => void; disabled: boolean }) {
   const isX11 = model === "x11";
-  return <div className={`dpi-editor${disabled ? " is-disabled" : ""}`}>{config.dpis.map((dpi, index) => <label className="dpi-row" key={index}><input type="checkbox" disabled={disabled} checked={config.active_dpi === index + 1} onChange={(event) => { if (event.target.checked) update("active_dpi", index + 1); }} /><span>DPI {index + 1}</span><input type="number" disabled={disabled} min={isX11 ? "50" : "100"} max={isX11 ? "22000" : "18000"} step={isX11 ? "50" : "100"} value={dpi} onChange={(event) => { const dpis = [...config.dpis]; dpis[index] = Number(event.target.value); update("dpis", dpis); }} /></label>)}</div>;
+  return <div className={`dpi-editor${disabled ? " is-disabled" : ""}`}>{config.dpis.map((dpi, index) => <label className="dpi-row" key={index}><ThemeCheckbox disabled={disabled} checked={config.active_dpi === index + 1} onCheckedChange={(checked) => { if (checked) update("active_dpi", index + 1); }} /><span>DPI {index + 1}</span><input type="number" disabled={disabled} min={isX11 ? "50" : "100"} max={isX11 ? "22000" : "18000"} step={isX11 ? "50" : "100"} value={dpi} onChange={(event) => { const dpis = [...config.dpis]; dpis[index] = Number(event.target.value); update("dpis", dpis); }} /></label>)}</div>;
 }
 
 function PollingControl({ value, update, disabled }: { value: PollingRate; update: (value: PollingRate) => void; disabled: boolean }) {

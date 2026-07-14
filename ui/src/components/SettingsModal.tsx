@@ -30,7 +30,7 @@ export function SettingsModal({
         <label className="settings-row"><span>{t.mouseSelection}</span><ThemeDropdown value={selection} onChange={onSelection} options={[{ value: "auto", label: `${t.automatic} (${detected})` }, { value: "r1", label: t.modelR1 }, { value: "x11", label: t.modelX11 }]} /></label>
         <label className="settings-row"><span>{t.language}</span><ThemeDropdown value={language} onChange={onLanguage} options={[{ value: "en", label: t.english }, { value: "pt", label: t.portuguese }]} /></label>
       </div>
-      <section className="settings-about"><h3>{t.about}</h3><p>{t.appDescription}</p><dl><div><dt>{t.version}</dt><dd>1.0.1</dd></div><div><dt>{t.developers}</dt><dd>SterTheStar</dd></div></dl><small>{t.protocolCredits}</small></section>
+      {!onboarding && <section className="settings-about"><h3>{t.about}</h3><dl><div><dt>{t.version}</dt><dd>1.0.1</dd></div><div><dt>{t.developers}</dt><dd>SterTheStar</dd></div></dl><small>{t.protocolCredits}</small></section>}
       {onboarding && <button className="settings-primary" onClick={onClose}>{t.getStarted}</button>}
     </section>
   </div>;
