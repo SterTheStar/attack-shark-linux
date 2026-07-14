@@ -13,10 +13,11 @@ install: ./driver
 	mkdir -p "${DESTDIR}etc"
 	install -Dm755  driver "${DESTDIR}usr/bin/attack-shark"
 	install -Dm644 99-attack-shark-r1.rules "${DESTDIR}usr/lib/udev/rules.d"
+	install -Dm644 99-attack-shark-x11.rules "${DESTDIR}usr/lib/udev/rules.d"
 	install -Dm644 --target-directory="${DESTDIR}etc" attack-shark.ini
 .PHONY: uninstall
 uninstall:
-	rm "${DESTDIR}usr/bin/attack-shark" "${DESTDIR}etc/attack-shark.ini" "${DESTDIR}usr/lib/udev/rules.d/99-attack-shark-r1.rules"
+	rm "${DESTDIR}usr/bin/attack-shark" "${DESTDIR}etc/attack-shark.ini" "${DESTDIR}usr/lib/udev/rules.d/99-attack-shark-r1.rules" "${DESTDIR}usr/lib/udev/rules.d/99-attack-shark-x11.rules"
 
 .PHONY: clean
 clean:

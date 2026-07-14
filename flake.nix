@@ -27,6 +27,7 @@
             cp target/release/attack-shark $out/bin/
             mkdir -p $out/etc/udev/rules.d
             cp ./99-attack-shark-r1.rules  $out/etc/udev/rules.d
+            cp ./99-attack-shark-x11.rules $out/etc/udev/rules.d
 
             runHook postInstall
           '';

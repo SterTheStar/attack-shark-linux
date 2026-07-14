@@ -87,15 +87,9 @@ fn run(cli: Cli) -> Result<()> {
     if cli.reapply_config {
         mouse.apply_config(&config)?;
     }
-    let battery_charge = if !mouse.is_wired() {
-        match mouse.read_status() {
-            Ok(charge) => Some(charge),
-            Err(DriverError::Usb(rusb::Error::Timeout)) => None,
-            Err(error) => return Err(error),
-        }
-    } else {
-        None
-    };
+    let battery_charge = (!mouse.is_wired())
+        .then(|| mouse.read_status().ok())
+        .flatten();
     if cli.query_charge {
         println!("{}", battery_charge.unwrap_or(0));
     }

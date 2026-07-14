@@ -23,6 +23,6 @@ pub enum DriverError {
     InvalidReport(String),
     #[error("no supported Attack Shark mouse was found")]
     DeviceNotFound,
-    #[error("USB error: {0}")]
-    Usb(#[from] rusb::Error),
+    #[error("HID error: {0}")]
+    Hid(#[from] hidapi::HidError),
 }
