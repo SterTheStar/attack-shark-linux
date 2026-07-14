@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 
@@ -59,32 +59,30 @@ impl Config {
     }
 
     pub fn parse(contents: &str) -> Result<Self> {
-        let values = parse_ini(contents);
-        let polling_rate = PollingRate::from_hz(
-            required(&values, "polling_rate")?
-                .parse()
-                .map_err(|_| invalid("polling_rate"))?,
-        )?;
-        let dpis = parse_dpis(required(&values, "dpis")?)?;
-        let active_dpi = parse_value(&values, "active_dpi")?;
+        let values: TomlConfig = toml::from_str(contents)
+            .map_err(|error| DriverError::InvalidConfig(error.to_string()))?;
+        let polling_rate = PollingRate::from_hz(values.polling_rate)?;
+        let dpis = values.dpis;
+        dpis.iter().try_for_each(|&dpi| Self::validate_dpi(dpi))?;
+        let active_dpi = values.active_dpi;
         if !(1..=6).contains(&active_dpi) {
             return Err(DriverError::InvalidConfig(
                 "active_dpi must be between 1 and 6".into(),
             ));
         }
-        let sleep_time: f64 = parse_value(&values, "sleep_time")?;
+        let sleep_time = values.sleep_time;
         if !(0.5..=30.0).contains(&sleep_time) {
             return Err(DriverError::InvalidConfig(
                 "sleep_time must be between 0.5 and 30".into(),
             ));
         }
-        let deep_sleep_time: u8 = parse_value(&values, "deep_sleep_time")?;
+        let deep_sleep_time = values.deep_sleep_time;
         if !(1..=60).contains(&deep_sleep_time) {
             return Err(DriverError::InvalidConfig(
                 "deep_sleep_time must be between 1 and 60".into(),
             ));
         }
-        let key_response_time: u8 = parse_value(&values, "key_response_time")?;
+        let key_response_time = values.key_response_time;
         if !(4..=50).contains(&key_response_time) || !key_response_time.is_multiple_of(2) {
             return Err(DriverError::InvalidConfig(
                 "key_response_time must be an even value between 4 and 50".into(),
@@ -97,8 +95,8 @@ impl Config {
             sleep_time,
             deep_sleep_time,
             key_response_time,
-            angle_snap: parse_value(&values, "angle_snap")?,
-            ripple_control: parse_value(&values, "ripple_control")?,
+            angle_snap: values.angle_snap,
+            ripple_control: values.ripple_control,
         })
     }
 
@@ -112,56 +110,16 @@ impl Config {
     }
 }
 
-fn parse_ini(contents: &str) -> HashMap<&str, &str> {
-    let mut values = HashMap::new();
-    let mut in_root_section = true;
-    for line in contents.lines() {
-        let line = line
-            .split_once('#')
-            .map_or(line, |(before, _)| before)
-            .trim();
-        if line.starts_with('[') && line.ends_with(']') {
-            in_root_section = false;
-            continue;
-        }
-        if !in_root_section {
-            continue;
-        }
-        if let Some((key, value)) = line.split_once('=') {
-            values.insert(key.trim(), value.trim());
-        }
-    }
-    values
-}
-
-fn required<'a>(values: &'a HashMap<&str, &str>, key: &str) -> Result<&'a str> {
-    values
-        .get(key)
-        .copied()
-        .ok_or_else(|| DriverError::InvalidConfig(format!("{key} was not provided")))
-}
-
-fn parse_value<T: std::str::FromStr>(values: &HashMap<&str, &str>, key: &str) -> Result<T> {
-    required(values, key)?.parse().map_err(|_| invalid(key))
-}
-
-fn parse_dpis(value: &str) -> Result<[u16; 6]> {
-    let values: Vec<u16> = value
-        .split_whitespace()
-        .map(|dpi| dpi.parse().map_err(|_| invalid("dpis")))
-        .collect::<Result<_>>()?;
-    let dpis: [u16; 6] = values.try_into().map_err(|values: Vec<u16>| {
-        DriverError::InvalidConfig(format!(
-            "dpis must contain exactly 6 values; got {}",
-            values.len()
-        ))
-    })?;
-    dpis.iter().try_for_each(|&dpi| Config::validate_dpi(dpi))?;
-    Ok(dpis)
-}
-
-fn invalid(key: &str) -> DriverError {
-    DriverError::InvalidConfig(format!("{key} has an invalid value"))
+#[derive(Deserialize)]
+struct TomlConfig {
+    polling_rate: u16,
+    dpis: [u16; 6],
+    active_dpi: u8,
+    sleep_time: f64,
+    deep_sleep_time: u8,
+    key_response_time: u8,
+    angle_snap: bool,
+    ripple_control: bool,
 }
 
 #[cfg(test)]
@@ -170,14 +128,14 @@ mod tests {
 
     #[test]
     fn parses_complete_configuration() {
-        let config = Config::parse(include_str!("../attack-shark.ini")).unwrap();
+        let config = Config::parse(include_str!("../config.toml")).unwrap();
         assert_eq!(config.dpis, [800, 1600, 3200, 4000, 5000, 12000]);
         assert_eq!(config.active_dpi, 3);
     }
 
     #[test]
-    fn ignores_values_outside_the_ini_root_section() {
-        let config = "[mouse]\npolling_rate = 1000\n";
+    fn rejects_incomplete_configuration() {
+        let config = "polling_rate = 1000\n";
         assert!(Config::parse(config).is_err());
     }
 }

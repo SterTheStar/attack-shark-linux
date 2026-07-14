@@ -81,11 +81,11 @@ sudo make install
 ## Configuration
 
 Driver searches for config file by checking following paths:
-- $XDG_CONFIG_HOME/attack-shark.ini
-- $HOME/.config/attack-shark.ini
-- /etc/attack-shark.ini
+- $XDG_CONFIG_HOME/attack-shark/config.toml
+- $HOME/.config/attack-shark/config.toml
+- /etc/attack-shark/config.toml
 
-### Default configuration [attack-shark.ini](attack-shark.ini)
+### Default configuration [config.toml](config.toml)
 
 ## HID permissions
 

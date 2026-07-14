@@ -123,9 +123,9 @@ fn default_config_path() -> PathBuf {
     std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
-        .map(|path| path.join("attack-shark.ini"))
+        .map(|path| path.join("attack-shark/config.toml"))
         .filter(|path| path.exists())
-        .unwrap_or_else(|| PathBuf::from("/etc/attack-shark.ini"))
+        .unwrap_or_else(|| PathBuf::from("/etc/attack-shark/config.toml"))
 }
 
 fn parse_dpi(value: &str) -> std::result::Result<(usize, u16), String> {

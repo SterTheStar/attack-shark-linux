@@ -1,0 +1,31 @@
+# Attack Shark mouse configuration.
+#
+# Place a personal configuration in ~/.config/attack-shark/config.toml, or in
+# $XDG_CONFIG_HOME/attack-shark/config.toml when XDG_CONFIG_HOME is set. The
+# system-wide fallback is /etc/attack-shark/config.toml.
+
+# USB report rate in Hz. Accepted values: 125, 250, 500, or 1000.
+polling_rate = 500
+
+# DPI value for each of the six onboard profiles. Each value must be a multiple
+# of 100 between 100 and 18000 for the R1.
+dpis = [800, 1600, 3200, 4000, 5000, 12000]
+
+# Active onboard DPI profile. This is one-based: 1 selects the first value in
+# `dpis`, while 6 selects the last.
+active_dpi = 3
+
+# Minutes of inactivity before normal sleep. Valid range: 0.5 to 30 minutes.
+sleep_time = 6.0
+
+# Minutes of inactivity before deep sleep. Valid range: 1 to 60 minutes.
+deep_sleep_time = 12
+
+# Click debounce time in milliseconds. Must be an even value from 4 to 50.
+key_response_time = 4
+
+# Smooth cursor movement by filtering abrupt direction changes.
+ripple_control = false
+
+# Keep cursor movement aligned to horizontal and vertical directions.
+angle_snap = false

@@ -233,18 +233,18 @@ fn default_config_path() -> PathBuf {
     let user_config = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
-        .map(|path| path.join("attack-shark.ini"));
+        .map(|path| path.join("attack-shark/config.toml"));
     if let Some(path) = user_config.filter(|path| path.exists()) {
         return path;
     }
 
-    let system_config = PathBuf::from("/etc/attack-shark.ini");
+    let system_config = PathBuf::from("/etc/attack-shark/config.toml");
     if system_config.exists() {
         return system_config;
     }
 
     // This keeps `cargo run -- --gui` aligned with the repository default.
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../attack-shark.ini")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../config.toml")
 }
 
 fn main() {

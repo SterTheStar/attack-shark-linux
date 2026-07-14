@@ -1,5 +1,5 @@
 pkgname="attack-shark"
-pkgver="1.0.1"
+pkgver="1.0.0"
 pkgrel="1"
 pkgdesc="Userspace driver for Attack Shark mice"
 arch=("x86_64")

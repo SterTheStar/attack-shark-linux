@@ -259,17 +259,18 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "attack-shark"
-version = "1.0.1"
+version = "1.0.0"
 dependencies = [
  "clap",
  "hidapi",
  "serde",
  "thiserror 2.0.18",
+ "toml 0.8.2",
 ]
 
 [[package]]
 name = "attack-shark-tauri"
-version = "1.0.1"
+version = "1.0.0"
 dependencies = [
  "attack-shark",
  "serde",
