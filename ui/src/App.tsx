@@ -6,6 +6,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import logoImage from "./assets/attack-shark-logo.webp";
 import mouseImage from "./assets/attack-shark.webp";
+import { BetaDisclaimer } from "./components/BetaDisclaimer";
 import { ConnectionIndicator } from "./components/ConnectionIndicator";
 import { PermissionWarning } from "./components/PermissionWarning";
 import { SettingsModal } from "./components/SettingsModal";
@@ -16,6 +17,7 @@ import type { ApplyResult, Config, ConnectionMode, DeviceModel, DeviceStatus, La
 
 const LANGUAGE_KEY = "attack-shark.language";
 const MODEL_KEY = "attack-shark.mouse-selection";
+const BETA_NOTICE_KEY = "attack-shark.beta-notice-accepted";
 const MINIMUM_APPLY_DURATION = 2000;
 
 const defaultConfig: Config = {
@@ -41,6 +43,7 @@ export function App() {
   const [selection, setSelection] = useState<MouseSelection>(() => (localStorage.getItem(MODEL_KEY) as MouseSelection) || "auto");
   const [showSettings, setShowSettings] = useState(false);
   const [onboarding, setOnboarding] = useState(() => !localStorage.getItem(MODEL_KEY));
+  const [betaNoticeAccepted, setBetaNoticeAccepted] = useState(() => localStorage.getItem(BETA_NOTICE_KEY) === "true");
   const applyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const t = translations[language];
   const canConfigure = connectionMode !== "unknown" && udevRule?.installed === true;
@@ -124,7 +127,8 @@ export function App() {
   return (
     <main className="app-shell">
       {isApplying && <div className="loading-overlay" role="status" aria-live="assertive"><div className="loader" /><span>{t.applying}</span></div>}
-      {(onboarding || showSettings) && <SettingsModal onboarding={onboarding} selection={selection} detectedModel={deviceModel} language={language} t={t} onSelection={(value) => { setSelection(value); localStorage.setItem(MODEL_KEY, value); }} onLanguage={(value) => { setLanguage(value); localStorage.setItem(LANGUAGE_KEY, value); }} onClose={() => { if (onboarding) localStorage.setItem(MODEL_KEY, selection); setOnboarding(false); setShowSettings(false); }} />}
+      {!betaNoticeAccepted && <BetaDisclaimer t={t} onAccepted={() => { localStorage.setItem(BETA_NOTICE_KEY, "true"); setBetaNoticeAccepted(true); }} />}
+      {betaNoticeAccepted && (onboarding || showSettings) && <SettingsModal onboarding={onboarding} selection={selection} detectedModel={deviceModel} language={language} t={t} onSelection={(value) => { setSelection(value); localStorage.setItem(MODEL_KEY, value); }} onLanguage={(value) => { setLanguage(value); localStorage.setItem(LANGUAGE_KEY, value); }} onClose={() => { if (onboarding) localStorage.setItem(MODEL_KEY, selection); setOnboarding(false); setShowSettings(false); }} />}
       <header className="titlebar" onMouseDown={(event) => { if (event.button === 0) void getCurrentWindow().startDragging(); }}>
         <div className="brand"><img src={logoImage} alt="Attack Shark" /></div>
         <div className="connection" aria-hidden="true" />

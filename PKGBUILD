@@ -3,6 +3,7 @@ pkgver="1.0.0"
 pkgrel="1"
 pkgdesc="Userspace driver for Attack Shark mice"
 arch=("x86_64")
+license=("GPL-3.0-only")
 depends=("libusb")
 makedepends=("cargo" "rust" "git")
 url="https://github.com/xb-bx/attack-shark-r1-driver"

@@ -17,11 +17,17 @@ install: ./driver
 	install -Dm644 99-attack-shark-r1.rules "${DESTDIR}usr/lib/udev/rules.d"
 	install -Dm644 99-attack-shark-x11.rules "${DESTDIR}usr/lib/udev/rules.d"
 	install -Dm644 --target-directory="${DESTDIR}etc/attack-shark" config.toml
-	install -Dm644 io.attackshark.driver.desktop "${DESTDIR}usr/share/applications/io.attackshark.driver.desktop"
-	install -Dm644 src-tauri/icons/128x128@2x.png "${DESTDIR}usr/share/icons/hicolor/256x256/apps/io.attackshark.driver.png"
+	install -Dm644 io.attackshark.driver.desktop "${DESTDIR}usr/share/applications/attack-shark.desktop"
+	install -Dm644 src-tauri/icons/128x128@2x.png "${DESTDIR}usr/share/icons/hicolor/256x256/apps/attack-shark.png"
 .PHONY: uninstall
 uninstall:
-	rm "${DESTDIR}usr/bin/attack-shark" "${DESTDIR}etc/attack-shark/config.toml" "${DESTDIR}usr/lib/udev/rules.d/99-attack-shark-r1.rules" "${DESTDIR}usr/lib/udev/rules.d/99-attack-shark-x11.rules" "${DESTDIR}usr/share/applications/io.attackshark.driver.desktop" "${DESTDIR}usr/share/icons/hicolor/256x256/apps/io.attackshark.driver.png"
+	rm "${DESTDIR}usr/bin/attack-shark" "${DESTDIR}etc/attack-shark/config.toml" "${DESTDIR}usr/lib/udev/rules.d/99-attack-shark-r1.rules" "${DESTDIR}usr/lib/udev/rules.d/99-attack-shark-x11.rules" "${DESTDIR}usr/share/applications/attack-shark.desktop" "${DESTDIR}usr/share/icons/hicolor/256x256/apps/attack-shark.png"
+
+.PHONY: bundles
+bundles:
+	npm install --prefix ui
+	ui/node_modules/.bin/tauri build --bundles deb,rpm
+	scripts/build-portable.sh
 
 .PHONY: clean
 clean:

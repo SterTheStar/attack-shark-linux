@@ -43,6 +43,11 @@ export const translations = {
     modelX11: "Attack Shark X11",
     onboardingTitle: "Welcome to Attack Shark",
     onboardingDescription: "Choose your mouse now. You can change this later in Settings.",
+    betaTitle: "Beta software notice",
+    betaDescription: "Attack Shark is an open-source beta project. It may contain bugs or unexpected behavior.",
+    betaLiability: "Use it at your own risk. The creator is not responsible for faults, data loss, damage, or other issues involving your mouse or computer.",
+    betaConfirm: "I understand and accept these terms.",
+    betaContinue: "Continue",
   },
   pt: {
     appDescription: "Configuração nativa para mouses Attack Shark compatíveis",
@@ -86,6 +91,11 @@ export const translations = {
     modelX11: "Attack Shark X11",
     onboardingTitle: "Bem-vinda ao Attack Shark",
     onboardingDescription: "Escolha seu mouse agora. É possível alterar depois em Configurações.",
+    betaTitle: "Aviso sobre software beta",
+    betaDescription: "O Attack Shark é um projeto open source em beta. Ele pode conter bugs ou ter comportamentos inesperados.",
+    betaLiability: "Use por sua conta e risco. A criadora não se responsabiliza por falhas, perda de dados, danos ou outros problemas envolvendo seu mouse ou computador.",
+    betaConfirm: "Eu entendo e aceito estes termos.",
+    betaContinue: "Continuar",
   },
 } as const;
 

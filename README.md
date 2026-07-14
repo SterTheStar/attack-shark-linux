@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="ui/src/assets/attack-shark-logo.webp" alt="Attack Shark" width="260" />
+  <img src="ui/src/assets/attack-shark-logo.webp" alt="Attack Shark" width="380" />
 
   <p>Linux driver and desktop UI for Attack Shark mice.</p>
 
@@ -8,12 +8,9 @@
     <img src="https://img.shields.io/badge/Rust-2024-black?logo=rust" alt="Rust" />
     <img src="https://img.shields.io/badge/Tauri-2-24C8D8?logo=tauri&logoColor=white" alt="Tauri 2" />
     <img src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" alt="React 19" />
-    <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License" />
+    <img src="https://img.shields.io/badge/License-GPLv3-blue" alt="GNU GPL v3 License" />
   </p>
 </div>
-
-Configuration uses the native HID interface (`hidraw`) and does not detach the
-kernel mouse driver.
 
 ## Supported models
 
@@ -60,23 +57,34 @@ npm install --prefix ui
 cargo run -- --gui
 ```
 
-## Installation
+## Release bundles
 
-### Arch-based distros
-
-```sh
-git clone https://github.com/SterTheStar/attack-shark.git
-cd attack-shark
-makepkg -si
-```
-
-### Other distributions
+Build the native Debian and RPM packages plus a portable archive:
 
 ```sh
-git clone https://github.com/SterTheStar/attack-shark.git
-cd attack-shark
-sudo make install
+make bundles
 ```
+
+The artifacts are written to:
+
+```text
+src-tauri/target/release/bundle/deb/
+src-tauri/target/release/bundle/rpm/
+target/release/attack-shark-<version>-linux-x86_64.tar.gz
+```
+
+The portable archive works on distributions without a matching native package.
+Extract it and run its installer as root:
+
+```sh
+tar -xzf attack-shark-<version>-linux-x86_64.tar.gz
+cd attack-shark-<version>-linux-x86_64
+sudo ./install.sh
+```
+
+Use `sudo ./install.sh --prefix /opt/attack-shark` to install the binary under
+a different prefix. The installer preserves an existing
+`/etc/attack-shark/config.toml` file.
 
 ## Configuration
 
@@ -84,8 +92,6 @@ Driver searches for config file by checking following paths:
 - $XDG_CONFIG_HOME/attack-shark/config.toml
 - $HOME/.config/attack-shark/config.toml
 - /etc/attack-shark/config.toml
-
-### Default configuration [config.toml](config.toml)
 
 ## HID permissions
 

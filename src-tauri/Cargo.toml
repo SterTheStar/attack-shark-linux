@@ -3,6 +3,10 @@ name = "attack-shark-tauri"
 version = "1.0.0"
 edition = "2024"
 
+[[bin]]
+name = "attack-shark"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2.4", features = [] }
 
