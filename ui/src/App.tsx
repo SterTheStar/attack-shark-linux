@@ -10,6 +10,7 @@ import { ConnectionIndicator } from "./components/ConnectionIndicator";
 import { PermissionWarning } from "./components/PermissionWarning";
 import { SettingsModal } from "./components/SettingsModal";
 import { ThemeCheckbox } from "./components/ThemeCheckbox";
+import { ThemeNumberInput } from "./components/ThemeNumberInput";
 import { translations, type Translation } from "./i18n";
 import type { ApplyResult, Config, ConnectionMode, DeviceModel, DeviceStatus, Language, MouseSelection, PollingRate, UdevRuleStatus } from "./types";
 
@@ -176,7 +177,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 
 function DpiEditor({ config, model, update, deferUpdate, commitUpdate, disabled }: { config: Config; model: DeviceModel; update: <K extends keyof Config>(key: K, value: Config[K]) => void; deferUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; commitUpdate: <K extends keyof Config>(key: K, value: Config[K]) => void; disabled: boolean }) {
   const isX11 = model === "x11";
-  return <div className={`dpi-editor${disabled ? " is-disabled" : ""}`}>{config.dpis.map((dpi, index) => <label className="dpi-row" key={index}><ThemeCheckbox disabled={disabled} checked={config.active_dpi === index + 1} onCheckedChange={(checked) => { if (checked) update("active_dpi", index + 1); }} /><span>DPI {index + 1}</span><input type="number" disabled={disabled} min={isX11 ? "50" : "100"} max={isX11 ? "22000" : "18000"} step={isX11 ? "50" : "100"} value={dpi} onChange={(event) => { const dpis = [...config.dpis]; dpis[index] = Number(event.target.value); deferUpdate("dpis", dpis); }} onBlur={(event) => { const dpis = [...config.dpis]; dpis[index] = Number(event.currentTarget.value); commitUpdate("dpis", dpis); }} /></label>)}</div>;
+  return <div className={`dpi-editor${disabled ? " is-disabled" : ""}`}>{config.dpis.map((dpi, index) => <label className="dpi-row" key={index}><ThemeCheckbox disabled={disabled} checked={config.active_dpi === index + 1} onCheckedChange={(checked) => { if (checked) update("active_dpi", index + 1); }} /><span>DPI {index + 1}</span><ThemeNumberInput disabled={disabled} min={isX11 ? 50 : 100} max={isX11 ? 22000 : 18000} step={isX11 ? 50 : 100} value={dpi} onValueChange={(value) => { const dpis = [...config.dpis]; dpis[index] = value; deferUpdate("dpis", dpis); }} onBlur={(value) => { const dpis = [...config.dpis]; dpis[index] = value; commitUpdate("dpis", dpis); }} /></label>)}</div>;
 }
 
 function PollingControl({ value, update, disabled }: { value: PollingRate; update: (value: PollingRate) => void; disabled: boolean }) {
