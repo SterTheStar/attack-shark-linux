@@ -569,7 +569,29 @@ button {
 
 .battery div {
 	height: 100%;
+	position: relative;
+	background: transparent;
+}
+
+.battery-wrap.is-charging .battery div::after {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
 	background: linear-gradient(90deg, #fb2415 0%, #ffbc08 43%, #64ff13 75%);
+	clip-path: inset(0 100% 0 0);
+	animation: battery-fill 1.8s linear infinite;
+}
+
+.battery-wrap.is-charging .battery div {
+	width: 100% !important;
+}
+
+@keyframes battery-fill {
+	0%, 8% { clip-path: inset(0 100% 0 0); }
+	78%, 100% { clip-path: inset(0 0 0 0); }
 }
 
 .battery-wrap strong {

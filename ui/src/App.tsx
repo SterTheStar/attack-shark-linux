@@ -151,9 +151,10 @@ export function App() {
       <section className="control-deck">
         <aside className="left-column">
           <Panel title={t.power}>
-            <div className="battery-wrap"><div className="battery"><div style={{ width: `${battery ?? 0}%` }} /></div><strong>{battery === null ? "—" : `${battery}%`}</strong></div>
+            <div className={`battery-wrap${connectionMode === "wired" ? " is-charging" : ""}`}><div className="battery"><div style={{ width: `${battery ?? 0}%` }} /></div><strong>{connectionMode === "wired" ? t.charging : battery === null ? "—" : `${battery}%`}</strong></div>
           </Panel>
           <Panel title={t.mouseAttributes}><Settings config={config} update={update} previewUpdate={previewUpdate} deferUpdate={deferUpdate} commitUpdate={commitUpdate} t={t} disabled={!canConfigure} /></Panel>
+          {deviceModel === "x11" && <Panel title={t.ledEffect}><LedControl config={config} update={update} commitUpdate={commitUpdate} disabled={!canConfigure} t={t} /></Panel>}
         </aside>
 
         <section className="mouse-stage">
@@ -165,7 +166,6 @@ export function App() {
         <aside className="right-column">
           <Panel title={t.dpiSettings}><DpiEditor config={config} model={deviceModel} update={update} deferUpdate={deferUpdate} commitUpdate={commitUpdate} disabled={!canConfigure} /></Panel>
           <Panel title={t.pollingRate}><PollingControl value={config.polling_rate} update={(value) => update("polling_rate", value)} disabled={!canConfigure} /></Panel>
-          {deviceModel === "x11" && <Panel title={t.ledEffect}><LedControl config={config} update={update} commitUpdate={commitUpdate} disabled={!canConfigure} t={t} /></Panel>}
         </aside>
       </section>
       <footer className="app-footer">Made with &lt;3 by <button onClick={() => void openUrl("https://x.com/onlysterbr").catch(console.error)}>Esther</button></footer>
