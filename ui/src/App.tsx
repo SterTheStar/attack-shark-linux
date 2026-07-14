@@ -124,7 +124,7 @@ export function App() {
   return (
     <main className="app-shell">
       {isApplying && <div className="loading-overlay" role="status" aria-live="assertive"><div className="loader" /><span>{t.applying}</span></div>}
-      {(onboarding || showSettings) && <SettingsModal onboarding={onboarding} selection={selection} detectedModel={deviceModel} language={language} t={t} onSelection={(value) => { setSelection(value); localStorage.setItem(MODEL_KEY, value); }} onLanguage={(value) => { setLanguage(value); localStorage.setItem(LANGUAGE_KEY, value); }} onClose={() => { setOnboarding(false); setShowSettings(false); }} />}
+      {(onboarding || showSettings) && <SettingsModal onboarding={onboarding} selection={selection} detectedModel={deviceModel} language={language} t={t} onSelection={(value) => { setSelection(value); localStorage.setItem(MODEL_KEY, value); }} onLanguage={(value) => { setLanguage(value); localStorage.setItem(LANGUAGE_KEY, value); }} onClose={() => { if (onboarding) localStorage.setItem(MODEL_KEY, selection); setOnboarding(false); setShowSettings(false); }} />}
       <header className="titlebar" onMouseDown={(event) => { if (event.button === 0) void getCurrentWindow().startDragging(); }}>
         <div className="brand"><img src={logoImage} alt="Attack Shark" /></div>
         <div className="connection" aria-hidden="true" />
